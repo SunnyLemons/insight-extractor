@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import axios, { AxiosError } from 'axios';
+import api from '../services/axios';
 import '../App.css';
 
 // Define interfaces
@@ -71,72 +71,30 @@ const ProjectDetail: React.FC = () => {
 
   const fetchProjectDetails = async () => {
     try {
-      // Fetch project details
-      const projectResponse = await axios.get(`/projects/${id}`);
+      // Fetch project details with insights and actions in a single call
+      const projectResponse = await api.get(`/projects/${id}`);
       const projectData = projectResponse.data;
-      setProject(projectData);
-
-      // Fetch insights for the project with their actions
-      const insightsResponse = await axios.get(`/insights?project=${id}`);
       
-      console.log('Full insights response:', insightsResponse.data);
+      // Log detailed project data for debugging
+      console.log('🔍 Full Project Details:', {
+        projectId: projectData._id,
+        name: projectData.name,
+        insightsCount: projectData.insights?.length || 0,
+        insightsWithActions: projectData.insights?.map((insight: Insight) => ({
+          insightId: insight._id,
+          text: insight.text,
+          actionsCount: insight.actions?.length || 0
+        }))
+      });
 
-      // Determine the correct insights array
-      const insightsArray = insightsResponse.data.insights || 
-        (Array.isArray(insightsResponse.data) ? insightsResponse.data : []);
-
-      console.log('Processed insights array:', insightsArray);
-
-      // Fetch actions for each insight
-      const insightsWithDetails = await Promise.all(
-        insightsArray.map(async (insight: Insight) => {
-          try {
-            // Fetch full insight details
-            const insightDetailResponse = await axios.get(`/insights/${insight._id}`);
-            const insightWithActions = {
-              ...insightDetailResponse.data,
-              actions: [] // Will be populated if actions exist
-            };
-
-            // Fetch actions for the insight if they exist
-            try {
-              console.log(`Attempting to fetch actions for insight ${insight._id}`);
-              const actionsResponse = await axios.get(`/actions/insight/${insight._id}`);
-              console.log(`Actions response for insight ${insight._id}:`, actionsResponse.data);
-              
-              // Determine the correct actions array
-              const actionsArray = actionsResponse.data.actions || 
-                (Array.isArray(actionsResponse.data) ? actionsResponse.data : []);
-
-              console.log(`Processed actions for insight ${insight._id}:`, actionsArray);
-
-              insightWithActions.actions = actionsArray;
-            } catch (actionsError) {
-              console.error(`Error fetching actions for insight ${insight._id}:`, actionsError);
-              // If the error is an axios error, log more details
-              if (axios.isAxiosError(actionsError)) {
-                console.error('Axios error details:', {
-                  response: actionsError.response,
-                  request: actionsError.request,
-                  message: actionsError.message
-                });
-              }
-            }
-
-            return insightWithActions;
-          } catch (detailError) {
-            console.error(`Error fetching details for insight ${insight._id}:`, detailError);
-            return insight;
-          }
-        })
-      );
-
-      console.log('Insights with details:', insightsWithDetails);
-      setInsights(insightsWithDetails);
+      // Set project and insights directly from the response
+      setProject(projectData);
+      setInsights(projectData.insights || []);
+      
       setIsLoading(false);
-    } catch (err) {
-      console.error('Error fetching project details:', err);
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+    } catch (error) {
+      console.error('Error fetching project details:', error);
+      setError(error instanceof Error ? error.message : 'An unexpected error occurred');
       setIsLoading(false);
     }
   };
@@ -173,7 +131,7 @@ const ProjectDetail: React.FC = () => {
       };
 
       // Send update to backend
-      const response = await axios.patch(`/actions/${editingActionId}`, updatePayload);
+      await api.patch(`/actions/${editingActionId}`, updatePayload);
 
       // Refresh project details to reflect changes
       await fetchProjectDetails();
@@ -202,7 +160,7 @@ const ProjectDetail: React.FC = () => {
   const handleCompleteAction = async (actionId: string) => {
     try {
       // Send request to update action status to 'completed'
-      const response = await axios.patch(`/actions/${actionId}/status`, { 
+      await api.patch(`/actions/${actionId}/status`, { 
         status: 'completed' 
       });
 
@@ -217,7 +175,7 @@ const ProjectDetail: React.FC = () => {
   const handleReproposedAction = async (actionId: string) => {
     try {
       // Send request to update action status back to 'proposed'
-      const response = await axios.patch(`/actions/${actionId}/status`, { 
+      await api.patch(`/actions/${actionId}/status`, { 
         status: 'proposed' 
       });
 
@@ -237,7 +195,7 @@ const ProjectDetail: React.FC = () => {
       if (!confirmDelete) return;
 
       // Send delete request
-      await axios.delete(`/actions/${actionId}`);
+      await api.delete(`/actions/${actionId}`);
 
       // Refresh project details
       await fetchProjectDetails();
@@ -255,7 +213,7 @@ const ProjectDetail: React.FC = () => {
       if (!confirmDelete) return;
 
       // Send delete request
-      await axios.delete(`/insights/${insightId}`);
+      await api.delete(`/insights/${insightId}`);
 
       // Refresh project details
       await fetchProjectDetails();

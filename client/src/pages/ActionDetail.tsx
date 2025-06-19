@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import axios from 'axios';
+import api from '../services/axios';
 import '../App.css';
 
 interface Project {
@@ -54,12 +54,12 @@ const ActionDetail: React.FC = () => {
   useEffect(() => {
     const fetchActionDetails = async () => {
       try {
-        const response = await axios.get(`/actions/${id}`);
+        const response = await api.get(`/actions/${id}`);
         setAction(response.data);
         setIsLoading(false);
       } catch (err) {
         console.error('Error fetching action details:', err);
-        setError('Failed to load action details');
+        setError(err instanceof Error ? err.message : 'Failed to load action details');
         setIsLoading(false);
       }
     };

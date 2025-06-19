@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { Link } from 'react-router-dom';
+import api from '../services/axios';
 
 // Define Project interface
 interface Project {
@@ -20,16 +20,14 @@ const Home: React.FC = () => {
   useEffect(() => {
     const fetchProjects = async () => {
       try {
-        const response = await axios.get('/projects');
+        const response = await api.get('/projects');
         
         setProjects(response.data.projects);
         setIsLoading(false);
       } catch (err) {
         console.error('Error fetching projects:', err);
         setError(
-          axios.isAxiosError(err) 
-            ? err.response?.data?.error || 'Failed to fetch projects' 
-            : 'An unexpected error occurred'
+          'An unexpected error occurred while fetching projects'
         );
         setIsLoading(false);
       }

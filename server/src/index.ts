@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response, NextFunction, ErrorRequestHandler } from 'express';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import cors from 'cors';
@@ -13,17 +13,39 @@ const app = express();
 // Middleware
 const CORS_ORIGIN = process.env.CORS_ORIGIN 
   ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
-  : ['http://localhost:3011'];
+  : [
+    'http://localhost:3000', 
+    'http://localhost:3011', 
+    'https://insight-extractor.netlify.app',
+    'https://insight-extractor-api.onrender.com'
+  ];
+
+console.log('🌐 Allowed CORS Origins:', CORS_ORIGIN);
+
+app.use((req, res, next) => {
+  console.log('🔍 Incoming Request:', {
+    method: req.method,
+    path: req.path,
+    headers: req.headers,
+    origin: req.get('origin'),
+    referrer: req.get('referrer')
+  });
+  next();
+});
 
 app.use(cors({
   origin: (origin, callback) => {
+    console.log('🔍 Incoming Origin:', origin);
+    
     // If no origin (like server-to-server calls), allow
     if (!origin) return callback(null, true);
     
-    // Check if the origin is in the allowed list
-    if (CORS_ORIGIN.indexOf(origin) !== -1 || CORS_ORIGIN.includes('*')) {
+    // Check if the origin is in the allowed list or is a wildcard
+    if (CORS_ORIGIN.includes('*') || CORS_ORIGIN.indexOf(origin) !== -1) {
+      console.log('✅ Origin Allowed:', origin);
       callback(null, true);
     } else {
+      console.warn('❌ Origin Not Allowed:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -60,14 +82,76 @@ mongoose.connect(MONGODB_URI, {
 // Routes
 app.use('/api', routes);
 
+// Debugging route to verify route mounting
+app.get('/api', (req, res) => {
+  console.log('🔍 Direct /api Route Accessed');
+  res.json({
+    message: 'InsightExtractor API Root',
+    routes: [
+      '/api/projects',
+      '/api/insights',
+      '/api/actions'
+    ]
+  });
+});
+
+// Add a catch-all route for debugging
+app.use((req, res, next) => {
+  console.error('🚨 Unhandled Route:', {
+    method: req.method,
+    path: req.path,
+    headers: req.headers,
+    body: req.body
+  });
+  
+  res.status(404).json({
+    error: 'Route Not Found',
+    method: req.method,
+    path: req.path
+  });
+});
+
 // Start server
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+const server = app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`📍 Base URL: http://localhost:${PORT}`);
+  console.log(`🔗 Full API Routes:`);
+  console.log('  - /api/projects');
+  console.log('  - /api/insights');
+  console.log('  - /api/actions');
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('🛑 SIGTERM received. Shutting down gracefully');
+  server.close(() => {
+    console.log('💤 Server closed');
+    process.exit(0);
+  });
 });
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
+
+// Add a catch-all error handler
+const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
+  console.error('🚨 Unhandled Error:', {
+    message: err.message,
+    stack: err.stack,
+    method: req.method,
+    path: req.path,
+    headers: req.headers
+  });
+  
+  res.status(500).json({
+    error: 'Internal Server Error',
+    message: err.message
+  });
+};
+
+app.use(errorHandler);
 
 export default app; 
