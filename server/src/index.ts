@@ -11,7 +11,26 @@ dotenv.config();
 const app = express();
 
 // Middleware
-app.use(cors());
+const CORS_ORIGIN = process.env.CORS_ORIGIN 
+  ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
+  : ['http://localhost:3011'];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // If no origin (like server-to-server calls), allow
+    if (!origin) return callback(null, true);
+    
+    // Check if the origin is in the allowed list
+    if (CORS_ORIGIN.indexOf(origin) !== -1 || CORS_ORIGIN.includes('*')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 
 // MongoDB Connection
