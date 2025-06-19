@@ -4,8 +4,9 @@
   "description": "Backend server for InsightExtractor",
   "main": "dist/index.js",
   "scripts": {
+    "clean": "rm -rf dist",
+    "build": "npm run clean && tsc",
     "start": "node dist/index.js",
-    "build": "tsc",
     "dev": "nodemon --exec ts-node src/index.ts",
     "check-db": "ts-node src/scripts/checkDatabase.ts",
     "netlify:build": "npm run build",
