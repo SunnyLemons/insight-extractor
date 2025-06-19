@@ -1,8 +1,14 @@
 import axios from 'axios';
 
 // Create an axios instance with a base URL
+const baseURL = process.env.REACT_APP_API_BASE_URL 
+  ? `${process.env.REACT_APP_API_BASE_URL}/api` 
+  : 'https://insight-extractor-api.onrender.com/api';
+
+console.log('API Base URL:', baseURL);
+
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_BASE_URL || '/api',
+  baseURL,
   timeout: 10000, // 10 seconds
   headers: {
     'Content-Type': 'application/json'
@@ -12,7 +18,8 @@ const api = axios.create({
 // Optional: Add request interceptor for logging or adding auth tokens
 api.interceptors.request.use(
   (config) => {
-    // You can modify config here, e.g., add authentication token
+    console.log('Request URL:', config.url);
+    console.log('Base URL:', config.baseURL);
     return config;
   },
   (error) => {
