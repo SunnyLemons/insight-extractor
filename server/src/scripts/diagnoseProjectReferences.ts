@@ -84,9 +84,6 @@ async function diagnoseProjectReferences(): Promise<void> {
       // Find actions for this insight with detailed project reference investigation
       const actions = await Action.find({ insight: insight._id })
         .populate({
-        path: "project",
-        select: "_id name"
-      })
           path: 'project',
           select: '_id name'
         });
@@ -196,5 +193,4 @@ async function diagnoseProjectReferences(): Promise<void> {
 }
 
 // Immediately invoke the function
-diagnoseProjectReferences()
-  .catch(console.error); 
+void diagnoseProjectReferences(); 

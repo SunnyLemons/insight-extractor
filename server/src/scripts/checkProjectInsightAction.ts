@@ -31,9 +31,6 @@ async function checkReferences() {
 
     // Check Insight
     const insight = await Insight.findById(insightId).populate({
-        path: "project",
-        select: "_id name"
-      })
       path: 'project',
       select: '_id name'
     });
@@ -50,16 +47,10 @@ async function checkReferences() {
     // Find Actions for this Insight
     const actions = await Action.find({ insight: insightId })
       .populate({
-        path: "project",
-        select: "_id name"
-      })
         path: 'insight',
         select: '_id text'
       })
       .populate({
-        path: "project",
-        select: "_id name"
-      })
         path: 'project',
         select: '_id name'
       });
@@ -86,4 +77,4 @@ async function checkReferences() {
 }
 
 // Run the check
-checkReferences(); 
+void checkReferences(); 
