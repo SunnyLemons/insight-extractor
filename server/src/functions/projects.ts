@@ -1,9 +1,8 @@
-import { HandlerEvent, HandlerContext } from '@netlify/functions';
 import { createHandler } from '../utils/serverlessHandler';
 import Project from '../models/Project';
 
 // Handler for getting all projects
-const getProjects = async (event: HandlerEvent, context: HandlerContext) => {
+const getProjects = async (event: any, context: any) => {
   // Check if it's a GET request
   if (event.httpMethod !== 'GET') {
     throw new Error('Method Not Allowed');
@@ -24,7 +23,7 @@ const getProjects = async (event: HandlerEvent, context: HandlerContext) => {
 };
 
 // Handler for creating a new project
-const createProject = async (event: HandlerEvent, context: HandlerContext) => {
+const createProject = async (event: any, context: any) => {
   // Check if it's a POST request
   if (event.httpMethod !== 'POST') {
     throw new Error('Method Not Allowed');
@@ -53,7 +52,7 @@ const createProject = async (event: HandlerEvent, context: HandlerContext) => {
 };
 
 // Export the handler based on the HTTP method
-export const handler = createHandler(async (event: HandlerEvent, context: HandlerContext) => {
+export const handler = createHandler(async (event, context) => {
   switch (event.httpMethod) {
     case 'GET':
       return getProjects(event, context);

@@ -1,5 +1,7 @@
-import { Handler, HandlerEvent, HandlerContext } from '@netlify/functions';
 import { connectToDatabase, disconnectFromDatabase } from './dbConnect';
+
+// Define a generic handler type
+type ServerlessHandler = (event: any, context: any) => Promise<any>;
 
 // Generic error response
 const createErrorResponse = (statusCode: number, message: string) => ({
@@ -27,9 +29,9 @@ const createSuccessResponse = (data: any, statusCode = 200) => ({
 
 // Base serverless function handler
 export const createHandler = (
-  handler: (event: HandlerEvent, context: HandlerContext) => Promise<any>
-): Handler => {
-  return async (event: HandlerEvent, context: HandlerContext) => {
+  handler: ServerlessHandler
+) => {
+  return async (event: any, context: any) => {
     // Handle CORS preflight requests
     if (event.httpMethod === 'OPTIONS') {
       return createSuccessResponse(null);
