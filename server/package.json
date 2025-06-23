@@ -5,11 +5,11 @@
   "main": "dist/index.js",
   "scripts": {
     "clean": "rm -rf dist",
-    "build": "npm run clean && tsc",
+    "build": "npx tsc",
     "start": "node dist/index.js",
     "dev": "nodemon --exec ts-node src/index.ts",
     "check-db": "ts-node src/scripts/checkDatabase.ts",
-    "netlify:build": "npm install && npm install -D @types/node @types/express @types/cors && npm run build",
+    "netlify:build": "npm install && npm install -D typescript @types/node @types/express @types/cors && npm run build",
     "netlify:serve": "netlify-lambda serve src",
     "netlify:build-server": "netlify-lambda build src"
   },
