@@ -1,8 +1,8 @@
 [build]
-  base = "server"
-  command = "npm ci && NODE_ENV=development npm run netlify:build"
-  publish = "dist"
-  functions = "functions"
+  base = "."
+  command = "npm run build:all"
+  publish = "client/build"
+  functions = "server/functions"
 
 [build.environment]
   NODE_VERSION = "18"
