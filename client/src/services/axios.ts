@@ -10,9 +10,9 @@ const getBaseURL = () => {
   
   // Default URLs for different environments
   const envBaseUrls = {
-    development: 'http://localhost:5011',
+    development: 'http://localhost:3011',
     production: 'https://insight-extractor.netlify.app/api',
-    test: 'http://localhost:5011'
+    test: 'http://localhost:3011'
   };
 
   // Prioritize environment variable, then environment-specific default
@@ -34,7 +34,7 @@ console.log('🌐 Final API Base URL:', baseURL);
 
 const api = axios.create({
   baseURL,
-  timeout: 10000, // 10 seconds
+  timeout: 30000, // 30 seconds
   headers: {
     'Content-Type': 'application/json'
   }

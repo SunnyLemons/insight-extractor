@@ -22,6 +22,9 @@ const CORS_ORIGIN = process.env.CORS_ORIGIN
 
 console.log('🌐 Allowed CORS Origins:', CORS_ORIGIN);
 
+// Preflight request handler
+app.options('*', cors()); // Enable preflight requests for all routes
+
 app.use((req, res, next) => {
   console.log('🔍 Incoming Request:', {
     method: req.method,
@@ -50,8 +53,16 @@ app.use(cors({
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With', 
+    'Accept', 
+    'Origin'
+  ],
+  exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar'],
+  maxAge: 600 // Cache preflight requests for 10 minutes
 }));
 app.use(express.json());
 

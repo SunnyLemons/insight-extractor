@@ -13,6 +13,9 @@ const router = express.Router();
 
 // Generate AI action for a specific insight
 router.post('/generate', async (req, res) => {
+  // Increase default timeout
+  req.setTimeout(60000); // 60 seconds
+
   try {
     const { insightId } = req.body;
     console.log('🚀 Generating action for insight:', insightId);
@@ -20,14 +23,16 @@ router.post('/generate', async (req, res) => {
     // Validate insight ID
     if (!insightId) {
       return res.status(400).json({ 
-        error: 'Insight ID is required to generate an action' 
+        error: 'Insight ID is required to generate an action',
+        details: 'No insight ID was provided in the request body.'
       });
     }
 
     // Validate insight ID format
     if (!mongoose.Types.ObjectId.isValid(insightId)) {
       return res.status(400).json({ 
-        error: 'Invalid insight ID format' 
+        error: 'Invalid insight ID format',
+        details: `Received ID: ${insightId}`
       });
     }
 
@@ -35,9 +40,13 @@ router.post('/generate', async (req, res) => {
     const insight = await Insight.findById(insightId).populate('project');
     if (!insight) {
       return res.status(404).json({ 
-        error: 'Insight not found' 
+        error: 'Insight not found',
+        details: `No insight found with ID: ${insightId}`
       });
     }
+
+    // Log start of AI processing
+    console.time(`Action Generation for Insight ${insightId}`);
 
     // Perform AI Triage first
     const triageResult = await triageAIService.performTriageScoring(
@@ -47,9 +56,11 @@ router.post('/generate', async (req, res) => {
 
     // Check if insight passes triage
     if (triageResult.triageStatus !== 'passed') {
+      console.timeEnd(`Action Generation for Insight ${insightId}`);
       return res.status(400).json({ 
         error: 'Insight did not pass triage',
-        triageResult 
+        triageResult,
+        details: 'The insight was not considered suitable for action generation.'
       });
     }
 
@@ -105,18 +116,23 @@ router.post('/generate', async (req, res) => {
     // Link action to insight
     await insight.addAction(savedAction._id as mongoose.Types.ObjectId);
 
+    // Log end of processing
+    console.timeEnd(`Action Generation for Insight ${insightId}`);
+
     res.status(201).json({
       message: 'Action generated successfully',
       action: savedAction,
       triageDetails: triageResult,
-      aiAnalysis: anthropicActionResult
+      aiAnalysis: anthropicActionResult,
+      processingTime: `Action generation completed`
     });
 
   } catch (error) {
     console.error('❌ Unexpected error in action generation:', error);
     res.status(500).json({ 
       error: 'Unexpected error during action generation', 
-      details: error instanceof Error ? error.message : 'Unknown error' 
+      details: error instanceof Error ? error.message : 'Unknown error',
+      fullError: error
     });
   }
 });

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../services/axios';
 import '../App.css';
+import ActionCard from '../components/ActionCard';
+import axios from 'axios';
 
 // Define interfaces
 interface Insight {
@@ -87,6 +89,11 @@ const ProjectDetail: React.FC = () => {
         }))
       });
 
+      // Validate project data structure
+      if (!projectData || !projectData._id) {
+        throw new Error('Invalid project data received');
+      }
+
       // Set project and insights directly from the response
       setProject(projectData);
       setInsights(projectData.insights || []);
@@ -94,7 +101,27 @@ const ProjectDetail: React.FC = () => {
       setIsLoading(false);
     } catch (error) {
       console.error('Error fetching project details:', error);
-      setError(error instanceof Error ? error.message : 'An unexpected error occurred');
+      
+      // More detailed error logging
+      if (axios.isAxiosError(error)) {
+        console.error('Axios Error Details:', {
+          status: error.response?.status,
+          data: error.response?.data,
+          headers: error.response?.headers
+        });
+
+        const errorMessage = 
+          error.response?.data?.error || 
+          error.response?.data?.message || 
+          `Failed to fetch project details. ${error.response?.status === 404 ? 'Project not found.' : ''}`;
+        
+        setError(errorMessage);
+      } else if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError('An unexpected error occurred while fetching project details');
+      }
+      
       setIsLoading(false);
     }
   };
@@ -160,14 +187,36 @@ const ProjectDetail: React.FC = () => {
   const handleCompleteAction = async (actionId: string) => {
     try {
       // Send request to update action status to 'completed'
-      await api.patch(`/actions/${actionId}/status`, { 
+      const response = await api.patch(`/actions/${actionId}/status`, { 
         status: 'completed' 
       });
+
+      // Log the response for debugging
+      console.log('Action Status Update Response:', response.data);
 
       // Refresh project details to reflect changes
       await fetchProjectDetails();
     } catch (error) {
       console.error('Error completing action:', error);
+      
+      // More detailed error logging
+      if (axios.isAxiosError(error)) {
+        console.error('Action Status Update Error:', {
+          status: error.response?.status,
+          data: error.response?.data,
+          headers: error.response?.headers,
+          errorType: error.code,
+          errorMessage: error.message
+        });
+
+        const errorMessage = 
+          error.response?.data?.error || 
+          error.response?.data?.message || 
+          'Failed to complete action. Please try again.';
+        
+        alert(errorMessage);
+      }
+
       alert('Failed to complete action. Please try again.');
     }
   };
@@ -175,14 +224,36 @@ const ProjectDetail: React.FC = () => {
   const handleReproposedAction = async (actionId: string) => {
     try {
       // Send request to update action status back to 'proposed'
-      await api.patch(`/actions/${actionId}/status`, { 
+      const response = await api.patch(`/actions/${actionId}/status`, { 
         status: 'proposed' 
       });
+
+      // Log the response for debugging
+      console.log('Action Status Update Response:', response.data);
 
       // Refresh project details to reflect changes
       await fetchProjectDetails();
     } catch (error) {
       console.error('Error re-proposing action:', error);
+      
+      // More detailed error logging
+      if (axios.isAxiosError(error)) {
+        console.error('Action Status Update Error:', {
+          status: error.response?.status,
+          data: error.response?.data,
+          headers: error.response?.headers,
+          errorType: error.code,
+          errorMessage: error.message
+        });
+
+        const errorMessage = 
+          error.response?.data?.error || 
+          error.response?.data?.message || 
+          'Failed to re-propose action. Please try again.';
+        
+        alert(errorMessage);
+      }
+
       alert('Failed to re-propose action. Please try again.');
     }
   };
@@ -593,217 +664,18 @@ const ProjectDetail: React.FC = () => {
                     filterActions(insight.actions || [], 'proposed')
                   )
                 ).map(action => (
-                  <div 
-                    key={action._id} 
-                    className="action-card" 
-                    style={{
-                      border: '1px solid #ddd',
-                      borderRadius: '8px',
-                      padding: '16px',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                      backgroundColor: 'white',
-                      width: '100%'
-                    }}
-                  >
-                    {editingActionId === action._id ? (
-                      // Editing mode
-                      <div>
-                        <input 
-                          type="text"
-                          value={editedAction.description || ''}
-                          onChange={(e) => handleInputChange('description', e.target.value)}
-                          style={{ width: '100%', marginBottom: '10px' }}
-                        />
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <button onClick={handleSaveAction}>Save</button>
-                          <button onClick={handleCancelEdit}>Cancel</button>
-                        </div>
-                      </div>
-                    ) : (
-                      // View mode
-                      <>
-                        <div style={{ 
-                          display: 'flex', 
-                          justifyContent: 'space-between', 
-                          alignItems: 'center',
-                          marginBottom: '10px'
-                        }}>
-                          <h3 style={{ margin: 0 }}>
-                            {action.categoryArea || 'Action'}
-                          </h3>
-                          <span 
-                            style={{ 
-                              backgroundColor: '#f0f0f0', 
-                              padding: '4px 8px', 
-                              borderRadius: '4px',
-                              fontSize: '0.8em'
-                            }}
-                          >
-                            Priority Score: {action.priorityScore}
-                          </span>
-                        </div>
-                        
-                        {/* Main Action Description */}
-                        <p style={{ 
-                          marginBottom: '15px', 
-                          color: '#333' 
-                        }}>
-                          {action.description}
-                        </p>
-                        
-                        {/* Action Card Footer */}
-                        <div style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          marginTop: '15px',
-                          borderTop: '1px solid #e0e0e0',
-                          paddingTop: '10px'
-                        }}>
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '10px'
-                          }}>
-                            <span style={{
-                              backgroundColor: '#e9ecef',
-                              padding: '4px 8px',
-                              borderRadius: '4px',
-                              fontSize: '0.8em'
-                            }}>
-                              Reach: {action.reach}
-                            </span>
-                            <span style={{
-                              backgroundColor: '#e9ecef',
-                              padding: '4px 8px',
-                              borderRadius: '4px',
-                              fontSize: '0.8em'
-                            }}>
-                              Impact: {action.impact}
-                            </span>
-                          </div>
-                          <button
-                            style={{
-                              backgroundColor: '#007bff',
-                              color: 'white',
-                              border: 'none',
-                              padding: '8px 16px',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              fontSize: '0.9em',
-                              transition: 'background-color 0.3s ease'
-                            }}
-                            onClick={() => navigate(`/actions/${action._id}`)}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.backgroundColor = '#0056b3';
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.backgroundColor = '#007bff';
-                            }}
-                          >
-                            View Details
-                          </button>
-                        </div>
-                        
-                        {/* AI Generated Actions Section */}
-                        {action.aiGeneratedActions && action.aiGeneratedActions.length > 0 && (
-                          <div style={{
-                            backgroundColor: '#f9f9f9',
-                            borderRadius: '8px',
-                            padding: '15px',
-                            marginTop: '15px'
-                          }}>
-                            <h4 style={{ 
-                              marginTop: 0, 
-                              marginBottom: '10px', 
-                              color: '#007bff' 
-                            }}>
-                              Recommended Actions
-                            </h4>
-                            {action.aiGeneratedActions.map((aiAction, index) => (
-                              <div 
-                                key={index} 
-                                style={{
-                                  backgroundColor: 'white',
-                                  border: '1px solid #e0e0e0',
-                                  borderRadius: '6px',
-                                  padding: '12px',
-                                  marginBottom: '10px'
-                                }}
-                              >
-                                <div style={{
-                                  display: 'flex', 
-                                  justifyContent: 'space-between', 
-                                  alignItems: 'center',
-                                  marginBottom: '8px'
-                                }}>
-                                  <h5 style={{ 
-                                    margin: 0, 
-                                    color: '#333' 
-                                  }}>
-                                    {aiAction.domain}
-                                  </h5>
-                                  <span style={{
-                                    backgroundColor: '#e9ecef',
-                                    padding: '3px 6px',
-                                    borderRadius: '4px',
-                                    fontSize: '0.7em'
-                                  }}>
-                                    Priority: {aiAction.priority}
-                                  </span>
-                                </div>
-                                
-                                <p style={{ 
-                                  marginBottom: '8px', 
-                                  color: '#666' 
-                                }}>
-                                  {aiAction.description}
-                                </p>
-                                
-                                <div style={{
-                                  backgroundColor: '#f1f3f5',
-                                  borderRadius: '4px',
-                                  padding: '10px',
-                                  fontSize: '0.9em',
-                                  color: '#495057'
-                                }}>
-                                  <strong>Rationale:</strong> {aiAction.rationale}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        <div style={{ 
-                          display: 'flex', 
-                          justifyContent: 'space-between' 
-                        }}>
-                          <div>
-                            <button 
-                              onClick={() => handleEditAction(action)}
-                              style={{ marginRight: '8px' }}
-                            >
-                              Edit
-                            </button>
-                            <button 
-                              onClick={() => handleCompleteAction(action._id)}
-                              style={{ marginRight: '8px' }}
-                            >
-                              Complete
-                            </button>
-                            <button 
-                              onClick={() => handleDeleteAction(action._id)}
-                              style={{ 
-                                backgroundColor: '#ff4d4d', 
-                                color: 'white' 
-                              }}
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </div>
-                      </>
+                  <ActionCard 
+                    key={action._id}
+                    action={action}
+                    variant="proposed"
+                    onEdit={() => handleEditAction(action)}
+                    onComplete={() => handleCompleteAction(action._id)}
+                    onDelete={() => handleDeleteAction(action._id)}
+                    actionCount={insights.reduce((total, insight) => 
+                      total + (insight.actions?.filter(a => a.status === 'proposed').length || 0), 
+                      0
                     )}
-                  </div>
+                  />
                 ))}
               </div>
             ) : (
@@ -842,83 +714,17 @@ const ProjectDetail: React.FC = () => {
                 {insights.flatMap(insight => 
                   sortActions(filterActions(insight.actions || [], 'completed'))
                     .map(action => (
-                      <div 
-                        key={action._id} 
-                        className="action-card" 
-                        style={{
-                          border: '1px solid #ddd',
-                          borderRadius: '8px',
-                          padding: '16px',
-                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                          backgroundColor: '#f0f0f0',
-                          width: '100%'
-                        }}
-                      >
-                        <div style={{ 
-                          display: 'flex', 
-                          justifyContent: 'space-between', 
-                          alignItems: 'center',
-                          marginBottom: '10px'
-                        }}>
-                          <h3 style={{ margin: 0 }}>
-                            {action.categoryArea || 'Completed Action'}
-                          </h3>
-                          <span 
-                            style={{ 
-                              backgroundColor: '#e0e0e0', 
-                              padding: '4px 8px', 
-                              borderRadius: '4px',
-                              fontSize: '0.8em'
-                            }}
-                          >
-                            Priority: {action.priorityScore}
-                          </span>
-                        </div>
-                        <p style={{ marginBottom: '10px' }}>
-                          {action.description}
-                        </p>
-                        <div style={{ 
-                          display: 'grid', 
-                          gridTemplateColumns: '1fr 1fr', 
-                          gap: '8px',
-                          marginBottom: '10px'
-                        }}>
-                          <div>
-                            <strong>Reach:</strong> {action.reach}
-                          </div>
-                          <div>
-                            <strong>Impact:</strong> {action.impact}
-                          </div>
-                          <div>
-                            <strong>Confidence:</strong> {action.confidence}
-                          </div>
-                          <div>
-                            <strong>Effort:</strong> {action.effort}
-                          </div>
-                        </div>
-                        <div style={{ 
-                          display: 'flex', 
-                          justifyContent: 'space-between' 
-                        }}>
-                          <div>
-                            <button 
-                              onClick={() => handleReproposedAction(action._id)}
-                            >
-                              Re-propose
-                            </button>
-                            <button 
-                              onClick={() => handleDeleteAction(action._id)}
-                              style={{ 
-                                backgroundColor: '#ff4d4d', 
-                                color: 'white',
-                                marginLeft: '8px'
-                              }}
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </div>
-                      </div>
+                      <ActionCard 
+                        key={action._id}
+                        action={action}
+                        variant="completed"
+                        onRepropose={() => handleReproposedAction(action._id)}
+                        onDelete={() => handleDeleteAction(action._id)}
+                        actionCount={insights.reduce((total, insight) => 
+                          total + (insight.actions?.filter(a => a.status === 'completed').length || 0), 
+                          0
+                        )}
+                      />
                     ))
                 )}
               </div>

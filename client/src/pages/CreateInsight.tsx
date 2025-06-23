@@ -1,6 +1,7 @@
 import React, { useState, useEffect, FormEvent } from 'react';
-import axios, { AxiosError } from 'axios';
+import axios, { AxiosError, isAxiosError } from 'axios';
 import { useNavigate, useLocation } from 'react-router-dom';
+import api from '../services/axios';
 
 // Define Project interface
 interface Project {
@@ -40,11 +41,23 @@ const CreateInsight: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [aiReasoning, setAiReasoning] = useState<string | null>(null);
 
+  // Add loading state for action generation
+  const [isGeneratingAction, setIsGeneratingAction] = useState(false);
+
   // Fetch projects on component mount
   useEffect(() => {
     const fetchProjects = async () => {
       try {
-        const response = await axios.get('/projects');
+        const response = await api.get('/projects');
+        
+        // Log the response for debugging
+        console.log('Projects Response:', response.data);
+
+        // Validate response structure
+        if (!response.data || !Array.isArray(response.data.projects)) {
+          throw new Error('Invalid projects response format');
+        }
+
         setProjects(response.data.projects);
         setIsLoadingProjects(false);
 
@@ -67,11 +80,26 @@ const CreateInsight: React.FC = () => {
         }
       } catch (err) {
         console.error('Error fetching projects:', err);
-        setProjectsError(
-          axios.isAxiosError(err) 
-            ? err.response?.data?.error || 'Failed to fetch projects' 
-            : 'An unexpected error occurred'
-        );
+        
+        // More detailed error logging
+        if (axios.isAxiosError(err)) {
+          console.error('Axios Error Details:', {
+            status: err.response?.status,
+            data: err.response?.data,
+            headers: err.response?.headers
+          });
+
+          setProjectsError(
+            err.response?.data?.error || 
+            err.response?.data?.message || 
+            'Failed to fetch projects. Please check your connection.'
+          );
+        } else if (err instanceof Error) {
+          setProjectsError(err.message);
+        } else {
+          setProjectsError('An unexpected error occurred');
+        }
+        
         setIsLoadingProjects(false);
       }
     };
@@ -88,34 +116,61 @@ const CreateInsight: React.FC = () => {
     }));
   };
 
-  // Add this method inside the CreateInsight component, after handleSubmit
+  // Modify generateActionForInsight method
   const generateActionForInsight = async (insightId: string) => {
+    setIsGeneratingAction(true);
     try {
-      const actionResponse = await axios.post('/actions/generate', { insightId });
+      // Increase timeout for this specific request if needed
+      const actionResponse = await api.post('/actions/generate', { insightId }, {
+        timeout: 45000 // 45 seconds
+      });
       console.log('Action generated:', actionResponse.data);
       return actionResponse.data;
     } catch (err) {
       console.error('Error generating action:', err);
-      // Optionally, you could show a toast or notification here
+      
+      // More detailed error logging
+      if (isAxiosError(err)) {
+        console.error('Action Generation Error:', {
+          status: err.response?.status,
+          data: err.response?.data,
+          headers: err.response?.headers,
+          errorType: err.code,
+          errorMessage: err.message
+        });
+
+        // Provide more context based on error response
+        const errorMessage = 
+          (err.response?.data as { error?: string })?.error || 
+          (err.code === 'ECONNABORTED' 
+            ? 'Action generation timed out. The process might be taking longer than expected.' 
+            : 'Failed to generate action. Please try again.');
+        
+        // Optional: show error to user
+        alert(errorMessage);
+      }
+      
       return null;
+    } finally {
+      setIsGeneratingAction(false);
     }
   };
 
-  // Modify the handleSubmit method to call generateActionForInsight
+  // Modify handleSubmit to use loading state
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
     setAiReasoning(null);
 
     try {
-      // Validate form data
+      // Validate input
       if (!formData.text.trim()) {
         setError('Insight text is required');
         return;
       }
 
       // Submit insight to backend
-      const response = await axios.post('/insights', formData);
+      const response = await api.post('/insights', formData);
 
       // Show triage result
       const { insight, aiTriageReasoning } = response.data;
@@ -123,10 +178,15 @@ const CreateInsight: React.FC = () => {
       switch (insight.triageStatus) {
         case 'passed':
           // Automatically generate action for passed insights
-          const actionResult = await generateActionForInsight(insight._id);
-          resultMessage = actionResult 
-            ? 'Insight passed triage and an action was generated!' 
-            : 'Insight passed triage, but action generation failed.';
+          try {
+            const actionResult = await generateActionForInsight(insight._id);
+            resultMessage = actionResult 
+              ? 'Insight passed triage and an action was generated!' 
+              : 'Insight passed triage, but action generation failed.';
+          } catch (actionGenError) {
+            console.error('Action generation error:', actionGenError);
+            resultMessage = 'Insight passed triage, but action generation encountered an error.';
+          }
           break;
         case 'research_needed':
           resultMessage = 'Insight needs further research before optimization.';
@@ -155,14 +215,21 @@ const CreateInsight: React.FC = () => {
       console.error('Error creating insight:', err);
       
       // Type-safe error handling
-      if (axios.isAxiosError(err)) {
-        const axiosError = err as AxiosError<ErrorResponse>;
+      if (isAxiosError(err)) {
+        console.error('Insight Creation Error:', {
+          status: err.response?.status,
+          data: err.response?.data,
+          headers: err.response?.headers
+        });
+
         const errorMessage = 
-          axiosError.response?.data?.error || 
-          axiosError.response?.data?.message || 
+          (err.response?.data as ErrorResponse)?.error || 
+          (err.response?.data as ErrorResponse)?.message || 
           'Failed to create insight. Please try again.';
         
         setError(errorMessage);
+      } else if (err instanceof Error) {
+        setError(err.message);
       } else {
         setError('An unexpected error occurred');
       }
@@ -246,7 +313,7 @@ const CreateInsight: React.FC = () => {
             <button 
               type="submit" 
               className="submit-btn"
-              disabled={isLoadingProjects}
+              disabled={isLoadingProjects || isGeneratingAction}
             >
               Create Insight
             </button>
