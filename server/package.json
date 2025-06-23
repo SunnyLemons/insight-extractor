@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "clean": "rm -rf dist functions",
-    "build": "./node_modules/.bin/tsc && mkdir -p functions && cp dist/serverless.js functions/server.js && cp -r dist/routes dist/models dist/services dist/functions functions/",
+    "build": "./node_modules/.bin/tsc && mkdir -p functions && cp dist/serverless.js functions/server.js && cp -r dist/routes dist/models dist/services functions/",
     "start": "node dist/index.js",
     "dev": "nodemon --exec ts-node src/index.ts",
     "check-db": "ts-node src/scripts/checkDatabase.ts",
@@ -24,14 +24,12 @@
     "dotenv": "^16.5.0",
     "express": "^4.18.2",
     "mongoose": "^8.3.1",
-    "netlify-functions": "^2.0.0",
     "serverless-http": "^3.2.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/node": "^20.19.1",
-    "@types/netlify-functions": "^1.3.0",
     "nodemon": "^3.1.10",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"

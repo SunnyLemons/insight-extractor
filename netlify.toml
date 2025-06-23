@@ -10,11 +10,6 @@
   CI = "false"
 
 [[redirects]]
-  from = "/api/projects"
-  to = "/.netlify/functions/projects"
-  status = 200
-
-[[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/server"
   status = 200

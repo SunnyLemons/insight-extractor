@@ -21,7 +21,6 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@netlify/functions": "^4.1.6",
     "concurrently": "^8.2.0",
     "typescript": "^5.8.3"
   }
