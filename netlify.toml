@@ -1,6 +1,6 @@
 [build]
   base = "server"
-  command = "npm ci && npm run netlify:build"
+  command = "npm ci && NODE_ENV=development npm run netlify:build"
   publish = "dist"
   functions = "functions"
 
