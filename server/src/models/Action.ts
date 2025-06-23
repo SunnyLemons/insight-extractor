@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 // Define the Action interface
 export interface IAction extends mongoose.Document {
   insight: mongoose.Types.ObjectId; // Reference to parent Insight
+  project?: mongoose.Types.ObjectId; // Optional reference to Project
   
   // RICE Scoring
   reach: number; // 0-100 scale of users potentially reached
@@ -46,6 +47,11 @@ const ActionSchema = new mongoose.Schema<IAction>({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Insight',
     required: [true, 'Action must be linked to an insight']
+  },
+  project: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Project',
+    required: false
   },
   
   // RICE Scoring Fields
