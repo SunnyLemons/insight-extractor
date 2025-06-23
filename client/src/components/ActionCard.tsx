@@ -29,6 +29,9 @@ interface ActionCardProps {
   onRepropose?: (actionId: string) => void;
   variant?: 'proposed' | 'completed';
   actionCount?: number;
+  isEditing?: boolean;
+  onSave?: (action: Action) => void;
+  onCancelEdit?: () => void;
 }
 
 const ActionCard: React.FC<ActionCardProps> = ({
@@ -38,11 +41,17 @@ const ActionCard: React.FC<ActionCardProps> = ({
   onDelete, 
   onRepropose,
   variant = 'proposed',
-  actionCount = 0
+  actionCount = 0,
+  isEditing = false,
+  onSave,
+  onCancelEdit
 }) => {
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  
+  // State for editing
+  const [editedAction, setEditedAction] = useState<Action>({ ...action });
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -58,12 +67,114 @@ const ActionCard: React.FC<ActionCardProps> = ({
     };
   }, []);
 
+  // Handle input changes during editing
+  const handleInputChange = (field: keyof Action, value: number) => {
+    console.group('🔢 Input Change Tracking');
+    console.log('Field:', field);
+    console.log('New Value:', value);
+    console.log('Current Edited Action (Before):', editedAction);
+    console.trace('Call Stack');
+    console.groupEnd();
+
+    // Use functional update to ensure state is correctly updated
+    setEditedAction(prev => {
+      const updatedAction = {
+        ...prev,
+        [field]: value
+      };
+
+      console.group('🔄 Updated Action State');
+      console.log('Previous State:', prev);
+      console.log('Updated State:', updatedAction);
+      console.groupEnd();
+
+      return updatedAction;
+    });
+  };
+
+  // Render editing inputs or static values
+  const renderMetricInput = (label: string, field: keyof Action, color: string) => {
+    // Helper function to safely convert value to string
+    const formatValue = (value: unknown): string => {
+      // Handle different types of values
+      if (value === undefined) return 'N/A';
+      if (typeof value === 'number') return value.toString();
+      if (typeof value === 'string') return value;
+      
+      // For complex types, return a placeholder or stringify
+      return 'Complex Value';
+    };
+
+    // Determine if the field is a valid numeric input field
+    const isNumericField = 
+      field === 'reach' || 
+      field === 'impact' || 
+      field === 'confidence' || 
+      field === 'effort';
+
+    if (isEditing && isNumericField) {
+      return (
+        <div style={{
+          backgroundColor: '#f8f9fa',
+          padding: '8px',
+          borderRadius: '4px',
+          textAlign: 'center'
+        }}>
+          <strong>{label}</strong>
+          <input 
+            type="number"
+            value={formatValue(editedAction[field])}
+            onChange={(e) => {
+              // Log the input change for debugging
+              console.log('📊 Metric Input Change:', {
+                field,
+                rawValue: e.target.value,
+                parsedValue: Number(e.target.value),
+                currentEditedAction: editedAction
+              });
+
+              // Only update if it's a numeric field
+              if (isNumericField) {
+                handleInputChange(field, Number(e.target.value));
+              }
+            }}
+            style={{
+              width: '100%',
+              textAlign: 'center',
+              fontSize: '1.2em',
+              color: color,
+              border: '1px solid #ddd',
+              borderRadius: '4px',
+              padding: '4px'
+            }}
+            min={1}
+            max={10}
+          />
+        </div>
+      );
+    }
+    
+    return (
+      <div style={{
+        backgroundColor: '#f8f9fa',
+        padding: '8px',
+        borderRadius: '4px',
+        textAlign: 'center'
+      }}>
+        <strong>{label}</strong>
+        <div style={{ fontSize: '1.2em', color: color }}>
+          {formatValue(action[field])}
+        </div>
+      </div>
+    );
+  };
+
   // Render action buttons based on variant
   const renderActionButtons = () => {
     const buttons = [];
 
     if (variant === 'proposed') {
-      if (onEdit) {
+      if (onEdit && !isEditing) {
         buttons.push(
           <button 
             key="edit"
@@ -85,7 +196,66 @@ const ActionCard: React.FC<ActionCardProps> = ({
         );
       }
 
-      if (onComplete) {
+      if (isEditing) {
+        buttons.push(
+          <button 
+            key="save"
+            onClick={() => {
+              if (onSave) {
+                console.group('💾 Saving Action');
+                console.log('Current Edited Action:', editedAction);
+                console.log('Original Action:', action);
+                console.groupEnd();
+
+                // Merge edited action with original action
+                const updatedAction = {
+                  ...action,
+                  ...editedAction
+                };
+
+                onSave(updatedAction);
+                setIsMenuOpen(false);
+              }
+            }}
+            style={{
+              width: '100%', 
+              textAlign: 'left', 
+              backgroundColor: 'transparent', 
+              border: 'none',
+              padding: '10px 15px',
+              cursor: 'pointer',
+              color: '#28a745'
+            }}
+          >
+            Save
+          </button>
+        );
+
+        buttons.push(
+          <button 
+            key="cancel"
+            onClick={() => {
+              if (onCancelEdit) {
+                onCancelEdit();
+                setIsMenuOpen(false);
+              }
+            }}
+            style={{
+              width: '100%', 
+              textAlign: 'left', 
+              backgroundColor: 'transparent', 
+              border: 'none',
+              padding: '10px 15px',
+              cursor: 'pointer',
+              color: '#dc3545'
+            }}
+          >
+            Cancel
+          </button>
+        );
+      }
+
+      if (onComplete && !isEditing) {
         buttons.push(
           <button 
             key="complete"
@@ -130,7 +300,7 @@ const ActionCard: React.FC<ActionCardProps> = ({
       );
     }
 
-    if (onDelete) {
+    if (onDelete && !isEditing) {
       buttons.push(
         <button 
           key="delete"
@@ -191,13 +361,33 @@ const ActionCard: React.FC<ActionCardProps> = ({
       </div>
 
       {/* Action Description */}
-      <p style={{ 
-        marginBottom: '15px', 
-        color: '#333',
-        fontStyle: 'italic'
-      }}>
-        {action.description}
-      </p>
+      {isEditing ? (
+        <textarea 
+          value={editedAction.description}
+          onChange={(e) => setEditedAction(prev => ({
+            ...prev,
+            description: e.target.value
+          }))}
+          style={{
+            width: '100%',
+            marginBottom: '15px', 
+            color: '#333',
+            fontStyle: 'italic',
+            border: '1px solid #ddd',
+            borderRadius: '4px',
+            padding: '8px'
+          }}
+          rows={3}
+        />
+      ) : (
+        <p style={{ 
+          marginBottom: '15px', 
+          color: '#333',
+          fontStyle: 'italic'
+        }}>
+          {action.description}
+        </p>
+      )}
 
       {/* Metrics Summary */}
       <div style={{
@@ -206,52 +396,12 @@ const ActionCard: React.FC<ActionCardProps> = ({
         gap: '10px',
         marginBottom: '15px'
       }}>
-        <div style={{
-          backgroundColor: '#f8f9fa',
-          padding: '8px',
-          borderRadius: '4px',
-          textAlign: 'center'
-        }}>
-          <strong>Reach</strong>
-          <div style={{ fontSize: '1.2em', color: '#007bff' }}>
-            {action.reach}
-          </div>
-        </div>
-        <div style={{
-          backgroundColor: '#f8f9fa',
-          padding: '8px',
-          borderRadius: '4px',
-          textAlign: 'center'
-        }}>
-          <strong>Impact</strong>
-          <div style={{ fontSize: '1.2em', color: '#28a745' }}>
-            {action.impact}
-          </div>
-        </div>
-        <div style={{
-          backgroundColor: '#f8f9fa',
-          padding: '8px',
-          borderRadius: '4px',
-          textAlign: 'center'
-        }}>
-          <strong>Confidence</strong>
-          <div style={{ fontSize: '1.2em', color: '#ffc107' }}>
-            {action.confidence}
-          </div>
-        </div>
-        <div style={{
-          backgroundColor: '#f8f9fa',
-          padding: '8px',
-          borderRadius: '4px',
-          textAlign: 'center'
-        }}>
-          <strong>Effort</strong>
-          <div style={{ fontSize: '1.2em', color: '#dc3545' }}>
-            {action.effort}
-          </div>
-        </div>
-        
+        {renderMetricInput('Reach', 'reach', '#007bff')}
+        {renderMetricInput('Impact', 'impact', '#28a745')}
+        {renderMetricInput('Confidence', 'confidence', '#ffc107')}
+        {renderMetricInput('Effort', 'effort', '#dc3545')}
       </div>
+      
       <div style={{
         backgroundColor: '#e9ecef',
         padding: '8px 16px',
@@ -280,7 +430,6 @@ const ActionCard: React.FC<ActionCardProps> = ({
               marginRight: '10px',
               borderRadius: '4px',
               textAlign: 'center',
-              
             }}
           >
             &#8230;
@@ -297,7 +446,6 @@ const ActionCard: React.FC<ActionCardProps> = ({
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
               zIndex: 10,
               minWidth: '150px'
-              
             }}>
               {renderActionButtons()}
             </div>
@@ -327,8 +475,6 @@ const ActionCard: React.FC<ActionCardProps> = ({
           View Details
         </button>
       </div>
-
-      
     </div>
   );
 };

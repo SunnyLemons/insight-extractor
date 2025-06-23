@@ -132,9 +132,51 @@ const ProjectDetail: React.FC = () => {
     }
   }, [id]);
 
+  // Modify state setters to add logging
+  const setEditingActionIdWithLogging = (id: string | null) => {
+    console.log('🔍 Setting Editing Action ID:', {
+      previousId: editingActionId,
+      newId: id,
+      stackTrace: new Error().stack
+    });
+    setEditingActionId(id);
+  };
+
+  const setEditedActionWithLogging = (action: Partial<Action> | ((prev: Partial<Action>) => Partial<Action>)) => {
+    console.group('🔄 Setting Edited Action');
+    console.log('Previous State:', editedAction);
+    
+    const newAction = typeof action === 'function' 
+      ? action(editedAction) 
+      : { ...editedAction, ...action };
+    
+    console.log('New State:', newAction);
+    console.trace('Update Stack Trace');
+    console.groupEnd();
+    
+    setEditedAction(newAction);
+  };
+
   const handleEditAction = (action: Action) => {
-    setEditingActionId(action._id);
-    setEditedAction({ ...action });
+    console.log('📝 Initiating Action Edit:', {
+      actionId: action._id,
+      originalAction: action,
+      currentEditedState: editedAction
+    });
+
+    // Use functional update to ensure correct state
+    setEditedActionWithLogging(() => ({
+      _id: action._id,
+      description: action.description,
+      status: action.status,
+      reach: action.reach,
+      impact: action.impact,
+      confidence: action.confidence,
+      effort: action.effort,
+      categoryArea: action.categoryArea
+    }));
+
+    setEditingActionIdWithLogging(action._id);
   };
 
   const handleCancelEdit = () => {
@@ -142,33 +184,82 @@ const ProjectDetail: React.FC = () => {
     setEditedAction({});
   };
 
-  const handleSaveAction = async () => {
+  const handleSaveAction = async (updatedAction: Partial<Action>) => {
     if (!editingActionId) return;
 
     try {
-      // Prepare the update payload
-      const updatePayload = {
-        description: editedAction.description,
-        status: editedAction.status,
-        reach: editedAction.reach,
-        impact: editedAction.impact,
-        confidence: editedAction.confidence,
-        effort: editedAction.effort,
-        categoryArea: editedAction.categoryArea
+      // Log the received updated action
+      console.group('🚀 Action Save Attempt');
+      console.log('Editing Action ID:', editingActionId);
+      console.log('Received Updated Action:', updatedAction);
+      console.groupEnd();
+
+      // Find the original action to use as a fallback
+      const originalAction = insights.flatMap(insight => 
+        insight.actions || []
+      ).find(action => action._id === editingActionId);
+
+      if (!originalAction) {
+        throw new Error('Original action not found');
+      }
+
+      // Prepare the update payload with explicit type conversion
+      const updatePayload: Partial<Action> = {
+        description: updatedAction.description ?? originalAction.description,
+        status: updatedAction.status ?? originalAction.status ?? 'proposed',
+        reach: updatedAction.reach !== undefined 
+          ? Number(updatedAction.reach) 
+          : originalAction.reach,
+        impact: updatedAction.impact !== undefined 
+          ? Number(updatedAction.impact) 
+          : originalAction.impact,
+        confidence: updatedAction.confidence !== undefined 
+          ? Number(updatedAction.confidence) 
+          : originalAction.confidence,
+        effort: updatedAction.effort !== undefined 
+          ? Number(updatedAction.effort) 
+          : originalAction.effort,
+        categoryArea: updatedAction.categoryArea ?? originalAction.categoryArea
       };
 
+      // Extremely verbose payload logging
+      console.group('📦 Update Payload Details');
+      console.log('Payload:', updatePayload);
+      console.log('Original Action:', originalAction);
+      console.log('Received Updated Action:', updatedAction);
+      console.groupEnd();
+
       // Send update to backend
-      await api.patch(`/actions/${editingActionId}`, updatePayload);
+      const response = await api.patch(`/actions/${editingActionId}`, updatePayload);
+
+      console.log('Action Update Response:', response.data);
 
       // Refresh project details to reflect changes
       await fetchProjectDetails();
 
       // Reset editing state
-      setEditingActionId(null);
-      setEditedAction({});
+      setEditedActionWithLogging({});
+      setEditingActionIdWithLogging(null);
     } catch (error) {
       console.error('Error updating action:', error);
-      alert('Failed to update action. Please try again.');
+      
+      // More detailed error logging
+      if (axios.isAxiosError(error)) {
+        console.error('Action Update Error:', {
+          status: error.response?.status,
+          data: error.response?.data,
+          headers: error.response?.headers
+        });
+
+        const errorMessage = 
+          error.response?.data?.error || 
+          error.response?.data?.message || 
+          'Failed to update action. Please try again.';
+        
+        alert(errorMessage);
+      } else {
+        alert('An unexpected error occurred. Please try again.');
+      }
     }
   };
 
@@ -668,13 +759,25 @@ const ProjectDetail: React.FC = () => {
                     key={action._id}
                     action={action}
                     variant="proposed"
-                    onEdit={() => handleEditAction(action)}
+                    onEdit={() => {
+                      setEditingActionId(action._id);
+                      setEditedAction({ ...action });
+                    }}
                     onComplete={() => handleCompleteAction(action._id)}
                     onDelete={() => handleDeleteAction(action._id)}
                     actionCount={insights.reduce((total, insight) => 
                       total + (insight.actions?.filter(a => a.status === 'proposed').length || 0), 
                       0
                     )}
+                    isEditing={editingActionId === action._id}
+                    onSave={(updatedAction) => {
+                      setEditedAction(updatedAction);
+                      handleSaveAction(updatedAction);
+                    }}
+                    onCancelEdit={() => {
+                      setEditingActionId(null);
+                      setEditedAction({});
+                    }}
                   />
                 ))}
               </div>
@@ -724,6 +827,15 @@ const ProjectDetail: React.FC = () => {
                           total + (insight.actions?.filter(a => a.status === 'completed').length || 0), 
                           0
                         )}
+                        isEditing={editingActionId === action._id}
+                        onSave={(updatedAction) => {
+                          setEditedAction(updatedAction);
+                          handleSaveAction(updatedAction);
+                        }}
+                        onCancelEdit={() => {
+                          setEditingActionId(null);
+                          setEditedAction({});
+                        }}
                       />
                     ))
                 )}

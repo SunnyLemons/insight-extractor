@@ -271,13 +271,13 @@ router.patch('/:actionId', async (req, res) => {
       { 
         new: true,  // Return the updated document
         runValidators: true,  // Run model validation on update
-        // Explicitly trigger save middleware
         setDefaultsOnInsert: true
       }
     );
 
     // If findByIdAndUpdate doesn't trigger save middleware, manually save
     if (updatedAction) {
+      // Explicitly trigger save middleware to recalculate priority score
       await updatedAction.save();
     }
 
