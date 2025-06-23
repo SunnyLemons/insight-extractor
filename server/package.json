@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "clean": "rm -rf dist functions",
-    "build": "./node_modules/.bin/tsc && mkdir -p functions && cp dist/serverless.js functions/server.js && cp -r dist/routes functions/routes",
+    "build": "./node_modules/.bin/tsc && mkdir -p functions && cp dist/serverless.js functions/server.js && cp -r dist/routes dist/models dist/services functions/",
     "start": "node dist/index.js",
     "dev": "nodemon --exec ts-node src/index.ts",
     "check-db": "ts-node src/scripts/checkDatabase.ts",
