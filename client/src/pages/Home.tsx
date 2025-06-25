@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/axios';
+import CreateInsight from '../components/CreateInsight';
 
 // Define Project interface
 interface Project {
@@ -16,6 +17,7 @@ const Home: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshProjects, setRefreshProjects] = useState(false);
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -34,7 +36,12 @@ const Home: React.FC = () => {
     };
 
     fetchProjects();
-  }, []);
+  }, [refreshProjects]);
+
+  const handleInsightCreated = () => {
+    // Trigger a refresh of projects
+    setRefreshProjects(prev => !prev);
+  };
 
   if (isLoading) {
     return (
@@ -61,13 +68,13 @@ const Home: React.FC = () => {
 
   return (
     <div className="home-container">
-      <h1>Insight Extractor</h1>
-      <p>Capture, triage, and optimize your product insights</p>
-      
-      <div className="home-actions">
-        <Link to="/projects/create" className="action-button">Create Project</Link>
-        <Link to="/insights/create" className="action-button">Create Insight</Link>
-      </div>
+      <h1>Hello, add your insight</h1>
+
+      {/* Add inline CreateInsight form */}
+      <CreateInsight 
+        onInsightCreated={handleInsightCreated}
+        initialProjectId={undefined}
+      />
 
       <div className="projects-section">
         <h2>Your Projects</h2>

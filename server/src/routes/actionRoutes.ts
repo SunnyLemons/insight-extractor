@@ -14,7 +14,7 @@ const router = express.Router();
 // Generate AI action for a specific insight
 router.post('/generate', async (req, res) => {
   // Increase default timeout
-  req.setTimeout(60000); // 60 seconds
+  req.setTimeout(120000); // 120 seconds (2 minutes)
 
   try {
     const { insightId } = req.body;
@@ -49,10 +49,19 @@ router.post('/generate', async (req, res) => {
     console.time(`Action Generation for Insight ${insightId}`);
 
     // Perform AI Triage first
-    const triageResult = await triageAIService.performTriageScoring(
-      insight.text, 
-      insight.source
-    );
+    let triageResult;
+    try {
+      triageResult = await triageAIService.performTriageScoring(
+        insight.text, 
+        insight.source
+      );
+    } catch (triageError) {
+      console.error('Triage Scoring Failed:', triageError);
+      return res.status(500).json({ 
+        error: 'Triage scoring failed',
+        details: triageError instanceof Error ? triageError.message : 'Unknown triage error'
+      });
+    }
 
     // Check if insight passes triage
     if (triageResult.triageStatus !== 'passed') {
@@ -70,16 +79,27 @@ router.post('/generate', async (req, res) => {
       : undefined;
 
     // Generate AI actions using Anthropic
-    const anthropicActionResult = await anthropicActionService.generateActions(
-      insight, 
-      {
-        clarity: triageResult.clarity,
-        impact: triageResult.impact,
-        score: triageResult.score,
-        reasoning: triageResult.explanation
-      },
-      projectDoc || undefined
-    );
+    let anthropicActionResult;
+    try {
+      anthropicActionResult = await anthropicActionService.generateActions(
+        insight, 
+        {
+          clarity: triageResult.clarity,
+          impact: triageResult.impact,
+          score: triageResult.score,
+          reasoning: triageResult.explanation
+        },
+        projectDoc || undefined
+      );
+    } catch (actionGenerationError) {
+      console.error('Action Generation Failed:', actionGenerationError);
+      return res.status(500).json({ 
+        error: 'Action generation failed',
+        details: actionGenerationError instanceof Error 
+          ? actionGenerationError.message 
+          : 'Unknown action generation error'
+      });
+    }
 
     // Create new action with multiple AI-generated actions
     const newAction = new Action({
@@ -132,7 +152,11 @@ router.post('/generate', async (req, res) => {
     res.status(500).json({ 
       error: 'Unexpected error during action generation', 
       details: error instanceof Error ? error.message : 'Unknown error',
-      fullError: error
+      fullError: error instanceof Error ? {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      } : error
     });
   }
 });

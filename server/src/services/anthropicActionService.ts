@@ -46,115 +46,113 @@ export class AnthropicActionService {
     return jsonMatch ? jsonMatch[0] : text;
   }
 
-  // Robust JSON parsing with fallback
+  // Enhanced parsing method with multiple strategies
   private parseResponse(responseText: string): AnthropicActionGenerationResult {
     try {
-      // First, try direct parsing
-      const parsedResult = JSON.parse(responseText);
+      // Try direct parsing first
+      const parsedResponse = JSON.parse(responseText);
       
-      // Validate the parsed result has required fields
+      // Validate the parsed response has the required structure
       if (
-        parsedResult.actions && 
-        Array.isArray(parsedResult.actions) && 
-        parsedResult.fullReasoning && 
-        parsedResult.keyInsights && 
-        parsedResult.potentialChallenges
+        parsedResponse.actions && 
+        Array.isArray(parsedResponse.actions) && 
+        parsedResponse.actions.length > 0
       ) {
-        // Ensure each action has proper RICE scoring
-        parsedResult.actions.forEach((action: {
-          riceScoring?: {
-            reach?: number;
-            impact?: number;
-            confidence?: number;
-            effort?: number;
-            priorityScore?: number;
-          }
-        }) => {
-          if (!action.riceScoring) {
-            action.riceScoring = {
-              reach: 50,
-              impact: 5,
-              confidence: 70,
-              effort: 3,
-              priorityScore: 5
-            };
-          }
-          
-          // Calculate priority score if not provided
-          if (!action.riceScoring.priorityScore) {
-            action.riceScoring.priorityScore = Math.round(
-              (action.riceScoring.reach || 50) * 
-              (action.riceScoring.impact || 5) * 
-              (action.riceScoring.confidence || 70) / 
-              ((action.riceScoring.effort || 3) * 100)
-            );
-          }
-        });
+        // Normalize and validate each action
+        const normalizedActions = parsedResponse.actions.map((action: any) => ({
+          domain: action.domain || 'Unspecified',
+          description: action.description || 'No description provided',
+          rationale: action.rationale || 'No rationale provided',
+          riceScoring: {
+            reach: action.riceScoring?.reach || 50,
+            impact: action.riceScoring?.impact || 5,
+            confidence: action.riceScoring?.confidence || 70,
+            effort: action.riceScoring?.effort || 3,
+            priorityScore: action.riceScoring?.priorityScore || 
+              Math.round((action.riceScoring?.reach || 50) * 
+                         (action.riceScoring?.impact || 5) * 
+                         (action.riceScoring?.confidence || 70) / 
+                         ((action.riceScoring?.effort || 3) * 100))
+          },
+          priority: action.priority || 5
+        }));
 
-        return parsedResult;
+        return {
+          actions: normalizedActions,
+          fullReasoning: parsedResponse.fullReasoning || 'No detailed reasoning provided',
+          keyInsights: parsedResponse.keyInsights || [],
+          potentialChallenges: parsedResponse.potentialChallenges || []
+        };
       }
     } catch (directParseError) {
-      console.warn('Direct JSON parsing failed, attempting extraction');
+      console.warn('Direct parsing failed, attempting advanced extraction');
     }
 
+    // Advanced extraction strategies
     try {
-      // Try extracting JSON from text
-      const extractedJson = this.extractJSON(responseText);
-      const parsedResult = JSON.parse(extractedJson);
-      
-      // Similar validation and scoring as above
-      parsedResult.actions.forEach((action: {
-        riceScoring?: {
-          reach?: number;
-          impact?: number;
-          confidence?: number;
-          effort?: number;
-          priorityScore?: number;
-        }
-      }) => {
-        if (!action.riceScoring) {
-          action.riceScoring = {
-            reach: 50,
-            impact: 5,
-            confidence: 70,
-            effort: 3,
-            priorityScore: 5
-          };
-        }
-        
-        if (!action.riceScoring.priorityScore) {
-          action.riceScoring.priorityScore = Math.round(
-            (action.riceScoring.reach || 50) * 
-            (action.riceScoring.impact || 5) * 
-            (action.riceScoring.confidence || 70) / 
-            ((action.riceScoring.effort || 3) * 100)
-          );
-        }
-      });
+      // Remove any leading/trailing whitespace and potential markdown code fences
+      const cleanedText = responseText
+        .replace(/^```(json)?/m, '')  // Remove opening code fence
+        .replace(/```$/m, '')         // Remove closing code fence
+        .trim();
 
-      return parsedResult;
+      // Try parsing the cleaned text
+      const parsedResponse = JSON.parse(cleanedText);
+
+      if (
+        parsedResponse.actions && 
+        Array.isArray(parsedResponse.actions) && 
+        parsedResponse.actions.length > 0
+      ) {
+        // Similar normalization as in the first parsing attempt
+        const normalizedActions = parsedResponse.actions.map((action: any) => ({
+          domain: action.domain || 'Unspecified',
+          description: action.description || 'No description provided',
+          rationale: action.rationale || 'No rationale provided',
+          riceScoring: {
+            reach: action.riceScoring?.reach || 50,
+            impact: action.riceScoring?.impact || 5,
+            confidence: action.riceScoring?.confidence || 70,
+            effort: action.riceScoring?.effort || 3,
+            priorityScore: action.riceScoring?.priorityScore || 
+              Math.round((action.riceScoring?.reach || 50) * 
+                         (action.riceScoring?.impact || 5) * 
+                         (action.riceScoring?.confidence || 70) / 
+                         ((action.riceScoring?.effort || 3) * 100))
+          },
+          priority: action.priority || 5
+        }));
+
+        return {
+          actions: normalizedActions,
+          fullReasoning: parsedResponse.fullReasoning || 'No detailed reasoning provided',
+          keyInsights: parsedResponse.keyInsights || [],
+          potentialChallenges: parsedResponse.potentialChallenges || []
+        };
+      }
     } catch (extractionError) {
-      console.error('Failed to extract and parse JSON:', extractionError);
+      console.error('Advanced extraction failed:', extractionError);
     }
 
-    // Fallback to manual parsing if all else fails
+    // Fallback for complex or unstructured responses
+    console.error('❌ Failed to parse AI response:', responseText);
     return {
       actions: [{
-        domain: 'Product UX',
-        description: 'Investigate and improve feature based on user feedback',
+        domain: 'General Analysis',
+        description: 'Comprehensive review needed',
         rationale: 'Unable to parse detailed AI response',
         riceScoring: {
           reach: 50,
           impact: 5,
-          confidence: 70,
+          confidence: 50,
           effort: 3,
-          priorityScore: 5
+          priorityScore: 4
         },
-        priority: 5
+        priority: 4
       }],
-      fullReasoning: 'AI response could not be parsed automatically',
-      keyInsights: ['Parsing error occurred'],
-      potentialChallenges: ['Unable to extract detailed insights']
+      fullReasoning: `Original response could not be parsed: ${responseText.slice(0, 500)}...`,
+      keyInsights: ['Parsing required manual review'],
+      potentialChallenges: ['Complex response structure']
     };
   }
 

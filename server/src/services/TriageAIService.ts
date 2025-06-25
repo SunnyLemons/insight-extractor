@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import dotenv from 'dotenv';
+import mongoose from 'mongoose';
 
 // Load environment variables
 dotenv.config();
@@ -19,6 +20,16 @@ export interface TriageResult {
   userSentiment: 'positive' | 'neutral' | 'negative'; // Emotional tone of the insight
   
   // Specific domain and feature tags
+  primaryDomain?: string;
+  affectedFeatures?: string[];
+}
+
+export interface IInsight extends mongoose.Document {
+  // Existing fields...
+  contextualRelevance?: number;
+  innovationPotential?: number;
+  urgency?: number;
+  userSentiment?: 'positive' | 'neutral' | 'negative';
   primaryDomain?: string;
   affectedFeatures?: string[];
 }
@@ -131,11 +142,20 @@ export class TriageAIService {
     } catch (error) {
       console.error('AI Triage Scoring Error:', error);
       
+      // More detailed error logging
+      if (error instanceof Error) {
+        console.error('Detailed Error:', {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        });
+      }
+      
       // Fallback result in case of complete failure
       return {
         clarity: 'vague',
         impact: 'nice_to_have',
-        explanation: 'Error in AI triage assessment',
+        explanation: `Error in AI triage assessment: ${error instanceof Error ? error.message : 'Unknown error'}`,
         score: 2,
         triageStatus: 'research_needed',
         contextualRelevance: 50,

@@ -22,14 +22,24 @@ interface ErrorResponse {
   message?: string;
 }
 
-const CreateInsight: React.FC = () => {
+// Add props interface for more flexibility
+interface CreateInsightProps {
+  onInsightCreated?: (insightId: string) => void;
+  initialProjectId?: string;
+}
+
+const CreateInsight: React.FC<CreateInsightProps> = ({ 
+  onInsightCreated, 
+  initialProjectId
+}) => {
   const navigate = useNavigate();
   const location = useLocation();
 
   // Form state
   const [formData, setFormData] = useState<InsightFormData>({
     text: '',
-    source: 'assumption_idea'
+    source: 'assumption_idea',
+    project: initialProjectId
   });
 
   // Projects state
@@ -50,9 +60,6 @@ const CreateInsight: React.FC = () => {
       try {
         const response = await api.get('/projects');
         
-        // Log the response for debugging
-        console.log('Projects Response:', response.data);
-
         // Validate response structure
         if (!response.data || !Array.isArray(response.data.projects)) {
           throw new Error('Invalid projects response format');
@@ -61,9 +68,9 @@ const CreateInsight: React.FC = () => {
         setProjects(response.data.projects);
         setIsLoadingProjects(false);
 
-        // Check for pre-selected project from URL
+        // Check for pre-selected project from URL or prop
         const searchParams = new URLSearchParams(location.search);
-        const preSelectedProjectId = searchParams.get('projectId');
+        const preSelectedProjectId = initialProjectId || searchParams.get('projectId');
         
         if (preSelectedProjectId) {
           // Validate that the project exists in the fetched projects
@@ -83,12 +90,6 @@ const CreateInsight: React.FC = () => {
         
         // More detailed error logging
         if (axios.isAxiosError(err)) {
-          console.error('Axios Error Details:', {
-            status: err.response?.status,
-            data: err.response?.data,
-            headers: err.response?.headers
-          });
-
           setProjectsError(
             err.response?.data?.error || 
             err.response?.data?.message || 
@@ -105,7 +106,7 @@ const CreateInsight: React.FC = () => {
     };
 
     fetchProjects();
-  }, [location.search]);
+  }, [location.search, initialProjectId]);
 
   // Handle input changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -122,7 +123,7 @@ const CreateInsight: React.FC = () => {
     try {
       // Increase timeout for this specific request if needed
       const actionResponse = await api.post('/actions/generate', { insightId }, {
-        timeout: 45000 // 45 seconds
+        timeout: 90000 // 90 seconds
       });
       console.log('Action generated:', actionResponse.data);
       return actionResponse.data;
@@ -140,14 +141,26 @@ const CreateInsight: React.FC = () => {
         });
 
         // Provide more context based on error response
+        const errorResponse = err.response?.data as { 
+          error?: string, 
+          details?: string, 
+          triageResult?: any 
+        };
+
         const errorMessage = 
-          (err.response?.data as { error?: string })?.error || 
+          errorResponse?.error || 
+          errorResponse?.details || 
           (err.code === 'ECONNABORTED' 
             ? 'Action generation timed out. The process might be taking longer than expected.' 
             : 'Failed to generate action. Please try again.');
         
         // Optional: show error to user
         alert(errorMessage);
+
+        // If triage failed, provide more context
+        if (errorResponse?.triageResult) {
+          console.warn('Triage Result:', errorResponse.triageResult);
+        }
       }
       
       return null;
@@ -156,7 +169,7 @@ const CreateInsight: React.FC = () => {
     }
   };
 
-  // Modify handleSubmit to use loading state
+  // Modify handleSubmit to handle more error scenarios
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
@@ -175,11 +188,13 @@ const CreateInsight: React.FC = () => {
       // Show triage result
       const { insight, aiTriageReasoning } = response.data;
       let resultMessage = '';
+      let actionResult = null;
+
       switch (insight.triageStatus) {
         case 'passed':
           // Automatically generate action for passed insights
           try {
-            const actionResult = await generateActionForInsight(insight._id);
+            actionResult = await generateActionForInsight(insight._id);
             resultMessage = actionResult 
               ? 'Insight passed triage and an action was generated!' 
               : 'Insight passed triage, but action generation failed.';
@@ -201,6 +216,11 @@ const CreateInsight: React.FC = () => {
       // Set AI reasoning
       setAiReasoning(aiTriageReasoning);
 
+      // Call onInsightCreated callback if provided
+      if (onInsightCreated) {
+        onInsightCreated(insight._id);
+      }
+
       // Show result and redirect
       alert(resultMessage);
 
@@ -211,6 +231,13 @@ const CreateInsight: React.FC = () => {
         // Otherwise, go to insights list
         navigate('/insights');
       }
+
+      // Reset form for inline usage
+      setFormData({
+        text: '',
+        source: 'assumption_idea',
+        project: initialProjectId
+      });
     } catch (err) {
       console.error('Error creating insight:', err);
       
@@ -222,100 +249,98 @@ const CreateInsight: React.FC = () => {
           headers: err.response?.headers
         });
 
+        const errorResponse = err.response?.data as ErrorResponse;
         const errorMessage = 
-          (err.response?.data as ErrorResponse)?.error || 
-          (err.response?.data as ErrorResponse)?.message || 
+          errorResponse?.error || 
+          errorResponse?.message || 
           'Failed to create insight. Please try again.';
         
+        // Provide more context about the error
         setError(errorMessage);
+        
+        // Optional: show more detailed error alert
+        alert(`Insight Creation Failed: ${errorMessage}`);
       } else if (err instanceof Error) {
         setError(err.message);
+        alert(`Unexpected Error: ${err.message}`);
       } else {
         setError('An unexpected error occurred');
+        alert('An unexpected error occurred while creating the insight.');
       }
     }
   };
 
+  // Render form with optional styling based on inline prop
   return (
-    <div className="create-insight-container">
+    <div className="create-insight-container inline-form">
       <div className="form-card">
-        <h1 className="form-title">Create New Insight</h1>
         
         {error && <div className="error-message">{error}</div>}
         
         <form onSubmit={handleSubmit} className="insight-form">
           <div className="form-group">
-            <label htmlFor="text" className="form-label">Insight Description</label>
             <textarea
               id="text"
               name="text"
               value={formData.text}
               onChange={handleChange}
-              placeholder="Describe your insight in detail"
-              className="form-input textarea"
+              placeholder="Describe your insight..."
               required
-              rows={4}
+              className="form-input insight-textarea"
+              rows={3}
             />
-            <small className="form-hint">
-              Provide a clear and concise description of your insight
-            </small>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="source" className="form-label">Source of Insight</label>
-            <select
-              id="source"
-              name="source"
-              value={formData.source}
-              onChange={handleChange}
-              className="form-input select"
-              required
-            >
-              <option value="assumption_idea">Assumption/Idea</option>
-              <option value="team_observation">Team Observation</option>
-              <option value="user_feedback">User Feedback</option>
-            </select>
-            <small className="form-hint">
-              Select the origin of this insight
-            </small>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="project" className="form-label">Project (Optional)</label>
-            {isLoadingProjects ? (
-              <p className="loading-text">Loading projects...</p>
-            ) : projectsError ? (
-              <p className="error-text">{projectsError}</p>
-            ) : (
-              <>
+          <div className="form-group project-dropdown-container">
+            <div className="dropdown-row">
+              <div className="form-group">
+                <label htmlFor="source" className="form-label">Insight Source</label>
                 <select
-                  id="project"
-                  name="project"
-                  value={formData.project || ''}
+                  id="source"
+                  name="source"
+                  value={formData.source}
                   onChange={handleChange}
-                  className="form-input select"
+                  className="form-input insight-select"
                 >
-                  <option value="">Select a project (optional)</option>
-                  {projects.map(project => (
-                    <option key={project._id} value={project._id}>
-                      {project.name}
-                    </option>
-                  ))}
+                  <option value="assumption_idea">Assumption/Idea</option>
+                  <option value="user_feedback">User Feedback</option>
+                  <option value="team_observation">Team Observation</option>
                 </select>
-                <small className="form-hint">
-                  Associate this insight with a specific project
-                </small>
-              </>
-            )}
+              </div>
+
+              {/* Always show project dropdown if multiple projects exist or no initial project */}
+              {(projects.length > 1 || !initialProjectId) && (
+                <div className="form-group project-dropdown-container">
+                  <label htmlFor="project" className="form-label">Select Project</label>
+                  <select
+                    id="project"
+                    name="project"
+                    value={formData.project || ''}
+                    onChange={handleChange}
+                    className="form-input insight-select"
+                    required={!initialProjectId}
+                  >
+                    <option value="">
+                      {initialProjectId ? 'Optional Project' : 'Select a Project'}
+                    </option>
+                    {projects.map(project => (
+                      <option key={project._id} value={project._id}>
+                        {project.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="form-actions">
             <button 
               type="submit" 
-              className="submit-btn"
-              disabled={isLoadingProjects || isGeneratingAction}
+              className="submit-button" 
+              disabled={isGeneratingAction}
             >
-              Create Insight
+              {isGeneratingAction ? 'Generating...' : 'Create Insight'}
             </button>
           </div>
         </form>
@@ -331,4 +356,4 @@ const CreateInsight: React.FC = () => {
   );
 };
 
-export default CreateInsight;
+export default CreateInsight; 
